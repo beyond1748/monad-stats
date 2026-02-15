@@ -13,7 +13,7 @@ OUT_DIR = Path("data/playercounts")
 
 def save_player_count(filename, visits, player_count):
     now = datetime.now()
-    csv_file = OUT_DIR / f"{filename}.csv"
+    csv_file = OUT_DIR / f"{filename}"
     
     file_exists = csv_file.exists()
     
@@ -39,7 +39,6 @@ def main():
         }
     )
 
-    # get all places id
     resp = session.get(f"https://games.roblox.com/v1/games?universeIds={','.join(UNIVERSES.values())}", timeout=30)
     resp.raise_for_status()
     places_payload = resp.json()
@@ -51,7 +50,7 @@ def main():
 
     names = list(UNIVERSES.keys())
     for i, item in enumerate(data):
-        print(item)
+        # print(item)
         save_player_count(f"{names[i]}.csv", item["visits"], item["playing"])
 
 
