@@ -1,6 +1,8 @@
 name: cursedgear-updates
 
 on:
+  schedule:
+    - cron: "0 * * * *"   # every hour, at minute 0
   workflow_dispatch:
 
 
@@ -26,5 +28,10 @@ jobs:
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add ./data
-          git commit -m "test"
-          git push
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update cursedgear data"
+            git push
+          fi
