@@ -1,0 +1,24 @@
+name: test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13' 
+      - name: Run script
+        env:
+          data: "hi"
+        run: python test.py
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ./data
+          git commit -m "test" || exit 0
+          git push
