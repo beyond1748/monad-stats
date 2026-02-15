@@ -70,8 +70,8 @@ def main():
     for i, place_id in enumerate(place_ids, start=1):
         url = f"https://economy.roblox.com/v2/assets/{place_id}/details"
 
-        # Small delay to reduce rate-limit risk
-        time.sleep(0.2)
+        # rate LIMIT
+        time.sleep(1)
 
         try:
             r = session.get(url, timeout=30)
