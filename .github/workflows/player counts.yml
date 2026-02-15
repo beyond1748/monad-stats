@@ -1,8 +1,8 @@
 name: cursedgear-updates
 
 on:
-  schedule:
-    - cron: "0,30 * * * *"   # 30 minutes?
+  #schedule:
+  #  - cron: "0,30 * * * *"   # 30 minutes?
   workflow_dispatch:
 
 
@@ -22,7 +22,7 @@ jobs:
       - name: Run script
         env:
           cookie: ${{ secrets.ROBLOX_COOKIE }}
-        run: python ./runscripts/cursedgearupdates.py
+        run: python ./runscripts/playerCounts.py
       - name: Commit changes
         run: |
           git config user.name github-actions
