@@ -52,7 +52,7 @@ def main():
     names = list(UNIVERSES.keys())
     for i, item in enumerate(data):
         print(item)
-        save_player_count(f"{names[i]}.csv", item.visits, item.playing)
+        save_player_count(f"{names[i]}.csv", item["visits"], item["playing"])
 
 
 
