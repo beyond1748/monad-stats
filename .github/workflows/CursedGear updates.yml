@@ -1,4 +1,4 @@
-name: test
+name: cursedgear-updates
 
 on:
   workflow_dispatch:
@@ -16,11 +16,11 @@ jobs:
         with:
           python-version: '3.13' 
       - run: pip install -r requirements.txt
-
+      
       - name: Run script
         env:
-          data: "hi"
-        run: python ./runscripts/test.py
+          cookie: ${{ secrets.ROBLOX_COOKIE }}
+        run: python ./runscripts/cursedgear.py
       - name: Commit changes
         run: |
           git config user.name github-actions
