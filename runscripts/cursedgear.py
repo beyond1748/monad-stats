@@ -107,6 +107,7 @@ def main():
         datetime.now(timezone.utc)
         .isoformat(timespec="seconds")
         .replace("+00:00", "Z")
+        .replace(":", "-")
     )
     out_path = OUT_DIR / f"{ts}.json"
 
