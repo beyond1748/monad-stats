@@ -7,7 +7,8 @@ import requests
 UNIVERSES = {
     'deepwoken': '1359573625',
     'cursedgear': '3726919761',
-    'deeptesting': '1966100065'
+    'deeptesting': '1966100065',
+    'roguelineage': '1087859240'
 }
 
 OUT_DIR = Path("data/playercounts")
