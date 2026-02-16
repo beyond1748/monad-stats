@@ -1,8 +1,8 @@
 name: cursedgear-updates
 
 on:
-  schedule:
-    - cron: "*/30 * * * *"   # 30 minutes?
+  #schedule:
+  #  - cron: "*/15 * * * *"   # 15 minutes?
   workflow_dispatch:
 
 

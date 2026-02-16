@@ -1,8 +1,8 @@
 name: player-counts
 
 on:
-  schedule:
-    - cron: "*/10 * * * *"   # every 10 mins?
+  #schedule:
+  #  - cron: "*/10 * * * *"   # every 10 mins?
   workflow_dispatch:
 
 
