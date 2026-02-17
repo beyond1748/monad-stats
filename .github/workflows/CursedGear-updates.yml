@@ -33,6 +33,6 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "Update cursedgear data"
-            git pull
+            git pull --rebase origin main
             git push
           fi
