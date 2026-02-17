@@ -13,8 +13,10 @@ UNIVERSES = {
 
 OUT_DIR = Path("data/playercounts")
 
+def timestring():
+    return datetime.now().isoformat() + 'Z'
+
 def save_player_count(filename, visits, player_count):
-    now = datetime.now()
     csv_file = OUT_DIR / f"{filename}"
     
     file_exists = csv_file.exists()
@@ -25,7 +27,7 @@ def save_player_count(filename, visits, player_count):
         if not file_exists:
             writer.writerow(['timestamp', 'visits', 'player_count'])
         
-        timestamp = now.isoformat() + 'Z'
+        timestamp = timestring()
         writer.writerow([timestamp, visits, player_count])
 
 
@@ -53,6 +55,7 @@ def main():
     names = list(UNIVERSES.keys())
     for i, item in enumerate(data):
         # print(item)
+        print(names[i], "|", f"{timestring()},{item["visits"]},{item["playing"]}\n")
         save_player_count(f"{names[i]}.csv", item["visits"], item["playing"])
 
 
