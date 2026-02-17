@@ -22,7 +22,7 @@ def save_player_count(filename, visits, player_count):
     file_exists = csv_file.exists()
     
     with open(csv_file, 'a', newline='') as f:
-        writer = csv.writer(f)
+        writer = csv.writer(f, lineterminator='\n')
         
         if not file_exists:
             writer.writerow(['timestamp', 'visits', 'player_count'])
