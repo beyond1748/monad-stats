@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Event Times</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root[data-theme="dark"] {
+    --bg: #111;
+    --card: #1a1a1a;
+    --border: #2a2a2a;
+    --border-ongoing: #555;
+    --text: #e0e0e0;
+    --dim: #666;
+    --badge-bg: #e0e0e0;
+    --badge-text: #111;
+    --progress-track: #2a2a2a;
+    --progress-fill: #e0e0e0;
+    --toggle-color: #555;
+  }
+
+  :root[data-theme="light"] {
+    --bg: #f5f5f5;
+    --card: #fff;
+    --border: #ddd;
+    --border-ongoing: #aaa;
+    --text: #222;
+    --dim: #888;
+    --badge-bg: #222;
+    --badge-text: #fff;
+    --progress-track: #eee;
+    --progress-fill: #222;
+    --toggle-color: #aaa;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  .top-bar {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 520px;
+    margin-bottom: 0.25rem;
+  }
+
+  h1 {
+    font-size: 1.2rem;
+    font-weight: 600;
+  }
+
+  .dark-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--toggle-color);
+    font-size: 0.75rem;
+    letter-spacing: 0.04em;
+    padding: 0;
+    transition: color 0.2s;
+    font-family: inherit;
+  }
+
+  .dark-toggle:hover { color: var(--dim); }
+
+  .meta {
+    font-size: 0.8rem;
+    color: var(--dim);
+    margin-bottom: 2rem;
+    width: 100%;
+    max-width: 520px;
+  }
+
+  .events {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 100%;
+    max-width: 520px;
+  }
+
+  .event-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.25rem 1.5rem;
+    transition: border-color 0.3s, background 0.2s;
+  }
+
+  .event-card.ongoing {
+    border-color: var(--border-ongoing);
+  }
+
+  .event-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .event-label {
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+
+  .badge {
+    font-size: 0.7rem;
+    background: var(--badge-bg);
+    color: var(--badge-text);
+    padding: 0.15em 0.5em;
+    border-radius: 3px;
+  }
+
+  .status-text {
+    font-size: 1.05rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .schedule-times {
+    font-size: 0.78rem;
+    color: var(--dim);
+    line-height: 1.8;
+  }
+
+  .progress-bar {
+    margin-top: 0.75rem;
+    height: 2px;
+    background: var(--progress-track);
+    border-radius: 2px;
+    overflow: hidden;
+    display: none;
+  }
+
+  .ongoing .progress-bar { display: block; }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--progress-fill);
+    border-radius: 2px;
+    transition: width 1s linear;
+  }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>Event Tracker</h1>
+  <button class="dark-toggle" id="toggle" onclick="toggleTheme()">light</button>
+</div>
+<div class="meta" id="meta">Loading...</div>
+
+<div class="events" id="events-container">
+  <!-- Cards injected by JS -->
+</div>
+
+<script>
+  const EVENT_DEFS = [
+    { key: 'a', name: 'Battle Royale', hours: [0, 3, 6, 9, 12, 15, 18, 21] },
+    { key: 'b', name: 'Carnival',      hours: [1, 4, 7, 10, 13, 16, 19, 22] },
+    { key: 'c', name: 'Parasol',       hours: [2, 5, 8, 11, 14, 17, 20, 23] },
+  ];
+
+  // Build card HTML for each event (once)
+  const container = document.getElementById('events-container');
+  EVENT_DEFS.forEach(ev => {
+    const div = document.createElement('div');
+    div.className = 'event-card';
+    div.id = `card-${ev.key}`;
+    div.innerHTML = `
+      <div class="event-header">
+        <span class="event-label">${ev.name}</span>
+        <span class="badge" id="badge-${ev.key}" style="display:none">LIVE</span>
+      </div>
+      <div class="status-text" id="status-${ev.key}">Loading...</div>
+      <div class="schedule-times" id="sched-${ev.key}"></div>
+      <div class="progress-bar"><div class="progress-fill" id="prog-${ev.key}"></div></div>
+    `;
+    container.appendChild(div);
+  });
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function formatDuration(seconds) {
+    if (seconds <= 0) return '0s';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}h ${pad(m)}m ${pad(s)}s`;
+    if (m > 0) return `${m}m ${pad(s)}s`;
+    return `${s}s`;
+  }
+
+  function getEventStatus(hours, nowUtcSec) {
+    const day = 86400;
+    nowUtcSec = ((nowUtcSec % day) + day) % day;
+    let minUntil = Infinity;
+
+    for (const h of hours) {
+      const start = h * 3600;
+      const end = start + 3600;
+      if (nowUtcSec >= start && nowUtcSec < end) {
+        const elapsed = nowUtcSec - start;
+        return { ongoing: true, remaining: 3600 - elapsed, progress: (elapsed / 3600) * 100, secondsUntil: 0 };
+      }
+      let until = start - nowUtcSec;
+      if (until < 0) until += day;
+      if (until < minUntil) minUntil = until;
+    }
+    return { ongoing: false, secondsUntil: minUntil };
+  }
+
+  function getUpcomingLocal(hours, count = 8) {
+    const now = new Date();
+    const results = hours.map(h => {
+      const d = new Date();
+      d.setUTCHours(h, 0, 0, 0);
+      if (d <= now) d.setUTCDate(d.getUTCDate() + 1);
+      return d;
+    });
+    results.sort((a, b) => a - b);
+    return results.slice(0, count);
+  }
+
+  function formatOccurrence(date) {
+    const now = new Date();
+    const tomorrow = new Date(now); tomorrow.setDate(now.getDate() + 1);
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (date.toDateString() === now.toDateString()) return `Today ${timeStr}`;
+    if (date.toDateString() === tomorrow.toDateString()) return `Tomorrow ${timeStr}`;
+    return date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) + ' ' + timeStr;
+  }
+
+  function buildScheduleHTML(hours) {
+    return getUpcomingLocal(hours).map(formatOccurrence).join('<br>');
+  }
+
+  function updateDisplay() {
+    const now = new Date();
+    const nowUtcSec = now.getUTCHours() * 3600 + now.getUTCMinutes() * 60 + now.getUTCSeconds();
+
+    const tzName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    document.getElementById('meta').textContent =
+      `${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })} — ${tzName}`;
+
+    // Compute statuses and sort
+    const withStatus = EVENT_DEFS.map(ev => ({
+      ...ev,
+      status: getEventStatus(ev.hours, nowUtcSec)
+    }));
+
+    // Sort: ongoing first (middle slot), then by secondsUntil for the rest
+    // Order goal: [next, ongoing, next-next]
+    const ongoing = withStatus.filter(e => e.status.ongoing);
+    const upcoming = withStatus.filter(e => !e.status.ongoing).sort((a, b) => a.status.secondsUntil - b.status.secondsUntil);
+
+    // Build display order: next, ongoing, next-next
+    let ordered = [];
+    if (ongoing.length === 0) {
+      // No ongoing event — show all upcoming in order
+      ordered = upcoming;
+    } else {
+      // Insert ongoing in the middle
+      ordered = [upcoming[0], ongoing[0], upcoming[1]].filter(Boolean);
+      // If there are more events somehow, append
+      upcoming.slice(2).forEach(e => ordered.push(e));
+    }
+
+    // Re-order DOM cards
+    const c = document.getElementById('events-container');
+    ordered.forEach(ev => c.appendChild(document.getElementById(`card-${ev.key}`)));
+
+    // Update content
+    withStatus.forEach(({ key, hours, status }) => {
+      const card = document.getElementById(`card-${key}`);
+      const statusEl = document.getElementById(`status-${key}`);
+      const badgeEl = document.getElementById(`badge-${key}`);
+      const progEl = document.getElementById(`prog-${key}`);
+      const schedEl = document.getElementById(`sched-${key}`);
+
+      schedEl.innerHTML = buildScheduleHTML(hours);
+
+      if (status.ongoing) {
+        card.classList.add('ongoing');
+        badgeEl.style.display = 'inline-block';
+        statusEl.textContent = `Ongoing — ends in ${formatDuration(status.remaining)}`;
+        progEl.style.width = status.progress.toFixed(2) + '%';
+      } else {
+        card.classList.remove('ongoing');
+        badgeEl.style.display = 'none';
+        statusEl.textContent = `Happening in ${formatDuration(status.secondsUntil)}`;
+      }
+    });
+  }
+
+  function toggleTheme() {
+    const root = document.documentElement;
+    const isDark = root.getAttribute('data-theme') === 'dark';
+    root.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    document.getElementById('toggle').textContent = isDark ? 'dark' : 'light';
+  }
+
+  updateDisplay();
+  setInterval(updateDisplay, 1000);
+  //polsia
+</script>
+</body>
+</html>

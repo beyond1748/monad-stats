@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>monad-stats</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        :root[data-theme="dark"] {
+            --bg: #111;
+            --card: #1a1a1a;
+            --border: #2a2a2a;
+            --border-ongoing: #555;
+            --text: #e0e0e0;
+            --dim: #666;
+            --badge-bg: #e0e0e0;
+            --badge-text: #111;
+            --progress-track: #2a2a2a;
+            --progress-fill: #e0e0e0;
+            --toggle-color: #555;
+        }
+
+        :root[data-theme="light"] {
+            --bg: #f5f5f5;
+            --card: #fff;
+            --border: #ddd;
+            --border-ongoing: #aaa;
+            --text: #222;
+            --dim: #888;
+            --badge-bg: #222;
+            --badge-text: #fff;
+            --progress-track: #eee;
+            --progress-fill: #222;
+            --toggle-color: #aaa;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 20px;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        h1 {
+            color: var(--text);
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .theme-toggle {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 10px;
+            font-size: 12px;
+            color: var(--dim);
+            cursor: pointer;
+            transition: all 0.2s;
+            opacity: 0.6;
+        }
+
+        .theme-toggle:hover {
+            opacity: 1;
+            border-color: var(--border-ongoing);
+        }
+
+        .tab-bar {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            background: var(--card);
+            padding: 10px 12px 0 12px;
+            border-radius: 8px 8px 0 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            gap: 10px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            overflow-x: auto;
+            flex: 1;
+        }
+
+        .tab {
+            padding: 8px 18px;
+            cursor: pointer;
+            border-radius: 6px 6px 0 0;
+            font-size: 13px;
+            color: var(--dim);
+            background: var(--bg);
+            border: none;
+            white-space: nowrap;
+            transition: all 0.15s;
+        }
+
+        .tab:hover { background: var(--border); color: var(--text); }
+        .tab.active { background: #3498db; color: white; font-weight: 500; }
+
+        /* Time Range Slider */
+        .time-slider-wrap {
+            background: var(--card);
+            padding: 16px 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            margin-bottom: 1px;
+        }
+
+        .time-labels {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: var(--dim);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .window-size-display {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--text);
+            font-size: 12px;
+            font-weight: 600;
+            background: var(--card);
+            padding: 2px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+
+        .slider-container {
+            margin-bottom: 12px;
+        }
+
+        .slider-track {
+            position: relative;
+            height: 8px;
+            background: var(--progress-track);
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .slider-range {
+            position: absolute;
+            height: 100%;
+            background: linear-gradient(90deg, #3498db, #5dade2);
+            border-radius: 4px;
+            cursor: move;
+        }
+
+        .slider-handle {
+            position: absolute;
+            width: 16px;
+            height: 20px;
+            background: var(--card);
+            border: 2px solid #3498db;
+            border-radius: 4px;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            cursor: ew-resize;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+
+        .slider-handle:hover {
+            background: var(--border);
+            border-color: #2980b9;
+        }
+
+        .preset-buttons {
+            display: flex;
+            gap: 6px;
+            justify-content: flex-end;
+        }
+
+        .preset-buttons button {
+            padding: 4px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 12px;
+            background: var(--card);
+            color: var(--dim);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .preset-buttons button:hover {
+            background: var(--border);
+            border-color: var(--border-ongoing);
+            color: var(--text);
+        }
+
+        .stats-wrap {
+            background: var(--card);
+            padding: 14px 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            margin-bottom: 1px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .stat-card {
+            background: var(--bg);
+            padding: 12px 14px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        .stat-label { color: var(--dim); font-size: 11px; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
+        .stat-value { color: var(--text); font-size: 20px; font-weight: 700; }
+
+        .charts-wrap {
+            background: var(--card);
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+
+        .chart-block { margin-bottom: 28px; }
+        .chart-block:last-child { margin-bottom: 0; }
+
+        .chart-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--dim);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 8px;
+        }
+
+        .missing-legend {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: var(--dim);
+            margin-top: 5px;
+        }
+
+        .loading, .empty {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--dim);
+            font-size: 14px;
+        }
+
+        .error {
+            background: #3d1a1a;
+            color: #ff6b6b;
+            padding: 14px 16px;
+            border-radius: 8px;
+            margin-bottom: 14px;
+            border-left: 3px solid #e74c3c;
+            font-size: 13px;
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(20,20,20,0.95);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            pointer-events: none;
+            font-size: 12px;
+            line-height: 1.6;
+            opacity: 0;
+            transition: opacity 0.15s;
+            z-index: 1000;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .axis text { font-size: 11px; fill: var(--dim); }
+        .axis path, .axis line { stroke: var(--border); }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>monad-stats</h1>
+        <button class="theme-toggle" onclick="toggleTheme()">◐</button>
+    </div>
+
+    <div id="error" class="error hidden"></div>
+    <div id="loading" class="loading">Loading data…</div>
+
+    <div id="main" class="hidden">
+        <div class="tab-bar">
+            <div class="tabs" id="tabs"></div>
+        </div>
+
+        <div class="time-slider-wrap">
+            <div class="time-labels">
+                <span id="sliderStartLabel"></span>
+                <span class="window-size-display" id="windowSizeDisplay"></span>
+                <span id="sliderEndLabel"></span>
+            </div>
+            <div class="slider-container">
+                <div id="sliderTrack" class="slider-track">
+                    <div id="sliderRange" class="slider-range"></div>
+                    <div id="sliderHandleStart" class="slider-handle"></div>
+                    <div id="sliderHandleEnd" class="slider-handle"></div>
+                </div>
+            </div>
+            <div class="preset-buttons">
+                <button onclick="setPreset('6h')">6h</button>
+                <button onclick="setPreset('12h')">12h</button>
+                <button onclick="setPreset('24h')">24h</button>
+                <button onclick="setPreset('7d')">7d</button>
+                <button onclick="setPreset('all')">All</button>
+            </div>
+        </div>
+
+        <div class="stats-wrap">
+            <div id="stats" class="stats"></div>
+        </div>
+
+        <div class="charts-wrap">
+            <div class="chart-block">
+                <div class="chart-title">Visit Changes (Delta)</div>
+                <div id="chart1"></div>
+            </div>
+            <div class="chart-block">
+                <div class="chart-title">Player Count</div>
+                <div id="chart2"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+    const GITHUB_OWNER = 'beyond1748';
+    const GITHUB_REPO  = 'monad-stats';
+    const GITHUB_BRANCH = 'main';  // Change if needed
+    const GITHUB_PATH   = 'data/playercounts';  // Folder path within repo
+
+    let gamesData = {};
+    let currentGame = null;
+    let sliderState = { startPercent: 0, endPercent: 100 };
+    let dataTimeRange = { min: null, max: null };
+    let isDragging = false;
+    let dragTarget = null;
+
+    // Initialize theme
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+
+    window.addEventListener('DOMContentLoaded', loadData);
+
+    function toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+    }
+
+    // ── Loading ───────────────────────────────────────────────────────────────
+
+    async function loadData() {
+        const errEl  = document.getElementById('error');
+        const loadEl = document.getElementById('loading');
+        const mainEl = document.getElementById('main');
+
+        errEl.classList.add('hidden');
+        loadEl.classList.remove('hidden');
+        mainEl.classList.add('hidden');
+
+        try {
+            const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${GITHUB_PATH}?ref=${GITHUB_BRANCH}`;
+            const res = await fetch(apiUrl);
+            if (!res.ok) throw new Error('Failed to fetch repository contents');
+
+            const files = await res.json();
+            const csvFiles = files.filter(f => f.name.endsWith('.csv'));
+            if (!csvFiles.length) throw new Error('No CSV files found');
+
+            gamesData = {};
+            for (const file of csvFiles) {
+                const name = file.name.replace('.csv', '');
+                const text = await (await fetch(file.download_url)).text();
+
+                const rows = d3.csvParse(text, d => {
+                    const parseVal = v => {
+                        if (!v || v.trim() === '' || v.trim().toLowerCase() === 'nan') return null;
+                        const n = parseFloat(v);
+                        return isNaN(n) ? null : n;
+                    };
+                    const visits = parseVal(d.visits);
+                    const pc     = parseVal(d.player_count);
+                    return {
+                        timestamp:    new Date(d.timestamp),
+                        visits,
+                        player_count: pc,
+                        missing:      visits === null || pc === null
+                    };
+                });
+
+                rows.sort((a, b) => a.timestamp - b.timestamp);
+                gamesData[name] = rows;
+            }
+
+            loadEl.classList.add('hidden');
+            mainEl.classList.remove('hidden');
+            renderTabs();
+            selectGame(Object.keys(gamesData)[0]);
+
+        } catch (err) {
+            loadEl.classList.add('hidden');
+            errEl.textContent = err.message;
+            errEl.classList.remove('hidden');
+        }
+    }
+
+    function convertToApiUrl(url) {
+        const m = url.match(/github\.com\/([^/]+)\/([^/]+)\/tree\/([^/]+)\/(.+)/);
+        if (!m) throw new Error('Invalid GitHub URL');
+        return `https://api.github.com/repos/${m[1]}/${m[2]}/contents/${m[4]}?ref=${m[3]}`;
+    }
+
+    // ── Tabs ──────────────────────────────────────────────────────────────────
+
+    function renderTabs() {
+        const el = document.getElementById('tabs');
+        el.innerHTML = '';
+        Object.keys(gamesData).forEach(name => {
+            const btn = document.createElement('button');
+            btn.className = 'tab';
+            btn.textContent = name;
+            btn.onclick = () => selectGame(name);
+            el.appendChild(btn);
+        });
+    }
+
+    function selectGame(name) {
+        currentGame = name;
+        document.querySelectorAll('.tab').forEach(t =>
+            t.classList.toggle('active', t.textContent === name));
+        
+        // Reset slider to show all data
+        sliderState = { startPercent: 0, endPercent: 100 };
+        updateDataTimeRange();
+        initSlider();
+        updateView();
+    }
+
+    // ── Slider ────────────────────────────────────────────────────────────────
+
+    function initSlider() {
+        const track = document.getElementById('sliderTrack');
+        const range = document.getElementById('sliderRange');
+        const handleStart = document.getElementById('sliderHandleStart');
+        const handleEnd = document.getElementById('sliderHandleEnd');
+
+        // Mouse down on handles
+        handleStart.addEventListener('mousedown', (e) => startDrag(e, 'start'));
+        handleEnd.addEventListener('mousedown', (e) => startDrag(e, 'end'));
+        
+        // Mouse down on range (drag entire window)
+        range.addEventListener('mousedown', (e) => startDrag(e, 'range'));
+        
+        // Track click (jump window center to click position)
+        track.addEventListener('mousedown', (e) => {
+            if (e.target === track) {
+                const rect = track.getBoundingClientRect();
+                const percent = ((e.clientX - rect.left) / rect.width) * 100;
+                const windowSize = sliderState.endPercent - sliderState.startPercent;
+                sliderState.startPercent = Math.max(0, percent - windowSize / 2);
+                sliderState.endPercent = Math.min(100, sliderState.startPercent + windowSize);
+                updateSliderUI();
+                updateView();
+            }
+        });
+
+        document.addEventListener('mousemove', onDrag);
+        document.addEventListener('mouseup', stopDrag);
+
+        updateSliderUI();
+    }
+
+    function startDrag(e, target) {
+        e.preventDefault();
+        e.stopPropagation();
+        isDragging = true;
+        dragTarget = target;
+        dragStartX = e.clientX;
+        dragStartState = { ...sliderState };
+    }
+
+    function onDrag(e) {
+        if (!isDragging) return;
+
+        const track = document.getElementById('sliderTrack');
+        const rect = track.getBoundingClientRect();
+        const deltaPercent = ((e.clientX - dragStartX) / rect.width) * 100;
+
+        if (dragTarget === 'start') {
+            const newStart = snapToIncrement(Math.max(0, Math.min(dragStartState.startPercent + deltaPercent, sliderState.endPercent - 1)));
+            sliderState.startPercent = newStart;
+        } else if (dragTarget === 'end') {
+            const newEnd = snapToIncrement(Math.max(sliderState.startPercent + 1, Math.min(100, dragStartState.endPercent + deltaPercent)));
+            sliderState.endPercent = newEnd;
+        } else if (dragTarget === 'range') {
+            const windowSize = dragStartState.endPercent - dragStartState.startPercent;
+            let newStart = snapToIncrement(dragStartState.startPercent + deltaPercent);
+            if (newStart < 0) newStart = 0;
+            if (newStart + windowSize > 100) newStart = 100 - windowSize;
+            sliderState.startPercent = newStart;
+            sliderState.endPercent = newStart + windowSize;
+        }
+
+        updateSliderUI();
+        updateView();
+    }
+
+    function stopDrag() {
+        isDragging = false;
+        dragTarget = null;
+    }
+
+    function updateSliderUI() {
+        const range = document.getElementById('sliderRange');
+        const handleStart = document.getElementById('sliderHandleStart');
+        const handleEnd = document.getElementById('sliderHandleEnd');
+
+        range.style.left = sliderState.startPercent + '%';
+        range.style.width = (sliderState.endPercent - sliderState.startPercent) + '%';
+        handleStart.style.left = sliderState.startPercent + '%';
+        handleEnd.style.left = sliderState.endPercent + '%';
+
+        // Update time labels and window size
+        if (dataTimeRange.min && dataTimeRange.max) {
+            const totalMs = dataTimeRange.max - dataTimeRange.min;
+            const startTime = new Date(dataTimeRange.min + (totalMs * sliderState.startPercent / 100));
+            const endTime = new Date(dataTimeRange.min + (totalMs * sliderState.endPercent / 100));
+            
+            document.getElementById('sliderStartLabel').textContent = formatSliderDate(startTime);
+            document.getElementById('sliderEndLabel').textContent = formatSliderDate(endTime);
+            
+            // Calculate and display window size
+            const windowMs = endTime - startTime;
+            document.getElementById('windowSizeDisplay').textContent = formatDuration(windowMs);
+        }
+    }
+
+    function formatDuration(ms) {
+        const seconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        const days = Math.floor(hours / 24);
+
+        if (days > 0) {
+            const remainingHours = hours % 24;
+            return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+        }
+        if (hours > 0) {
+            const remainingMinutes = minutes % 60;
+            return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+        }
+        if (minutes > 0) return `${minutes}m`;
+        return `${seconds}s`;
+    }
+
+    function snapToIncrement(percent) {
+        // Snap to 10-minute increments
+        if (!dataTimeRange.min || !dataTimeRange.max) return percent;
+        
+        const totalMs = dataTimeRange.max - dataTimeRange.min;
+        const tenMinutes = 600000; // 10 minutes in ms
+        const incrementPercent = (tenMinutes / totalMs) * 100;
+        
+        return Math.round(percent / incrementPercent) * incrementPercent;
+    }
+
+    function formatSliderDate(d) {
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const HH = String(d.getHours()).padStart(2, '0');
+        const MM = String(d.getMinutes()).padStart(2, '0');
+        return `${dd}/${mm} ${HH}:${MM}`;
+    }
+
+    function setPreset(preset) {
+        if (!dataTimeRange.min || !dataTimeRange.max) return;
+
+        const totalMs = dataTimeRange.max - dataTimeRange.min;
+        
+        if (preset === 'all') {
+            sliderState = { startPercent: 0, endPercent: 100 };
+        } else {
+            const presetMs = {
+                '6h': 6 * 3600000,
+                '12h': 12 * 3600000,
+                '24h': 24 * 3600000,
+                '7d': 7 * 86400000
+            }[preset];
+
+            const windowPercent = Math.min(100, (presetMs / totalMs) * 100);
+            sliderState.endPercent = 100;
+            sliderState.startPercent = Math.max(0, 100 - windowPercent);
+        }
+
+        updateSliderUI();
+        updateView();
+    }
+
+    function updateDataTimeRange() {
+        if (!currentGame || !gamesData[currentGame] || !gamesData[currentGame].length) return;
+        const data = gamesData[currentGame];
+        dataTimeRange.min = d3.min(data, d => d.timestamp).getTime();
+        dataTimeRange.max = d3.max(data, d => d.timestamp).getTime();
+    }
+
+    let dragStartX, dragStartState;
+
+    // ── View ──────────────────────────────────────────────────────────────────
+
+    function updateView() {
+        if (!currentGame || !dataTimeRange.min || !dataTimeRange.max) return;
+        
+        const allData = gamesData[currentGame];
+        
+        // Filter data based on slider position
+        const totalMs = dataTimeRange.max - dataTimeRange.min;
+        const startTime = dataTimeRange.min + (totalMs * sliderState.startPercent / 100);
+        const endTime = dataTimeRange.min + (totalMs * sliderState.endPercent / 100);
+        
+        const filteredData = allData.filter(d => {
+            const t = d.timestamp.getTime();
+            return t >= startTime && t <= endTime;
+        });
+
+        renderStats(filteredData);
+        renderChart('chart1', filteredData, 'visits',       '#3498db');
+        renderChart('chart2', filteredData, 'player_count', '#2ecc71');
+    }
+
+    // ── Stats ─────────────────────────────────────────────────────────────────
+
+    function renderStats(data) {
+        const ok   = data.filter(d => !d.missing);
+        const last = ok[ok.length - 1];
+        const missingCount = data.filter(d => d.missing).length;
+
+        document.getElementById('stats').innerHTML = `
+            <div class="stat-card">
+                <div class="stat-label">Total Visits</div>
+                <div class="stat-value">${last ? fmtNum(last.visits) : '—'}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Current Players</div>
+                <div class="stat-value">${last ? fmtNum(last.player_count) : '—'}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Peak Players</div>
+                <div class="stat-value">${fmtNum(d3.max(ok, d => d.player_count) ?? 0)}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Avg Players</div>
+                <div class="stat-value">${(d3.mean(ok, d => d.player_count) ?? 0).toFixed(1)}</div>
+            </div>
+            ${missingCount ? `
+            <div class="stat-card">
+                <div class="stat-label">Missing Points</div>
+                <div class="stat-value" style="color:#e67e22">${missingCount}</div>
+            </div>` : ''}
+        `;
+    }
+
+    function fmtNum(n) {
+        if (n == null) return '—';
+        const abs = Math.abs(n), sign = n < 0 ? '-' : '';
+        if (abs >= 1e9) return sign + (abs / 1e9).toFixed(2) + 'B';
+        if (abs >= 1e6) return sign + (abs / 1e6).toFixed(2) + 'M';
+        if (abs >= 1e3) return sign + (abs / 1e3).toFixed(1) + 'K';
+        return n.toLocaleString();
+    }
+
+    // ── Chart ─────────────────────────────────────────────────────────────────
+
+    function renderChart(containerId, rawData, metric, color) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+
+        if (!rawData.length) {
+            container.innerHTML = '<div class="empty">No data</div>';
+            return;
+        }
+
+        // Build per-point chartData
+        let chartData;
+        if (metric === 'visits') {
+            chartData = rawData.slice(1).map((d, i) => {
+                const prev    = rawData[i];
+                const missing = d.missing || prev.missing;
+                return {
+                    timestamp: d.timestamp,
+                    value:     missing ? null : d.visits - prev.visits,
+                    original:  missing ? null : d.visits,
+                    missing
+                };
+            });
+        } else {
+            chartData = rawData.map(d => ({
+                timestamp: d.timestamp,
+                value:     d.missing ? null : d[metric],
+                original:  d.missing ? null : d[metric],
+                missing:   d.missing
+            }));
+        }
+
+        const margin = { top: 12, right: 24, bottom: 34, left: 70 };
+        const width  = container.offsetWidth - margin.left - margin.right;
+        const height = 240 - margin.top - margin.bottom;
+
+        const svg = d3.select(`#${containerId}`)
+            .append('svg')
+            .attr('width',  width  + margin.left + margin.right)
+            .attr('height', height + margin.top  + margin.bottom)
+            .append('g')
+            .attr('transform', `translate(${margin.left},${margin.top})`);
+
+        // Scales
+        const x = d3.scaleTime()
+            .domain(d3.extent(chartData, d => d.timestamp))
+            .range([0, width]);
+
+        const definedVals = chartData.filter(d => d.value !== null).map(d => d.value);
+        const yMin = d3.min(definedVals) ?? 0;
+        const yMax = d3.max(definedVals) ?? 1;
+        
+        // Calculate domain to handle both positive-only and mixed positive/negative data
+        let domainMin, domainMax;
+        
+        if (yMin >= 0) {
+            // All positive values - start from 0
+            domainMin = 0;
+            domainMax = yMax * 1.1;
+        } else if (yMax <= 0) {
+            // All negative values - end at 0
+            domainMin = yMin * 1.1;
+            domainMax = 0;
+        } else {
+            // Mixed positive and negative - center around 0
+            const maxAbs = Math.max(Math.abs(yMin), Math.abs(yMax));
+            const pad = maxAbs * 0.1;
+            domainMin = yMin - pad;
+            domainMax = yMax + pad;
+        }
+
+        const y = d3.scaleLinear()
+            .domain([domainMin, domainMax])
+            .range([height, 0]);
+
+        // X axis — smart format based on time span
+        const span = x.domain()[1] - x.domain()[0];
+        svg.append('g')
+            .attr('class', 'axis')
+            .attr('transform', `translate(0,${height})`)
+            .call(
+                d3.axisBottom(x).ticks(6).tickFormat(d => {
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const HH = String(d.getHours()).padStart(2, '0');
+                    const MM = String(d.getMinutes()).padStart(2, '0');
+                    return span > 86400000 ? `${dd}/${mm} ${HH}:${MM}` : `${HH}:${MM}`;
+                })
+            );
+
+        // Y axis
+        svg.append('g')
+            .attr('class', 'axis')
+            .call(
+                d3.axisLeft(y).ticks(5).tickFormat(d => {
+                    const abs = Math.abs(d), sign = d < 0 ? '-' : '';
+                    if (abs >= 1e9) return sign + (abs / 1e9).toFixed(1) + 'B';
+                    if (abs >= 1e6) return sign + (abs / 1e6).toFixed(1) + 'M';
+                    if (abs >= 1e3) return sign + (abs / 1e3).toFixed(1) + 'K';
+                    return d.toFixed(0);
+                })
+            );
+
+        // Zero reference line (only for charts with negative values)
+        if (yMin < 0) {
+            svg.append('line')
+                .attr('x1', 0).attr('x2', width)
+                .attr('y1', y(0)).attr('y2', y(0))
+                .attr('stroke', 'var(--border-ongoing)').attr('stroke-width', 1)
+                .attr('opacity', 0.5);
+        }
+
+        // ── Missing-data gap handling ─────────────────────────────────────────
+        // Find adjacent defined points that span a gap, draw dashed bridge
+        for (let i = 1; i < chartData.length; i++) {
+            if (chartData[i - 1].value !== null && chartData[i].missing) {
+                // scan forward for next defined point
+                let j = i + 1;
+                while (j < chartData.length && chartData[j].missing) j++;
+                if (j < chartData.length && chartData[j].value !== null) {
+                    svg.append('line')
+                        .attr('x1', x(chartData[i - 1].timestamp))
+                        .attr('y1', y(chartData[i - 1].value))
+                        .attr('x2', x(chartData[j].timestamp))
+                        .attr('y2', y(chartData[j].value))
+                        .attr('stroke', color)
+                        .attr('stroke-width', 1.5)
+                        .attr('stroke-dasharray', '5,4')
+                        .attr('opacity', 0.4);
+                }
+            }
+        }
+
+        // Solid line — breaks where value is null
+        svg.append('path')
+            .datum(chartData)
+            .attr('fill', 'none')
+            .attr('stroke', color)
+            .attr('stroke-width', 2)
+            .attr('d',
+                d3.line()
+                  .defined(d => d.value !== null)
+                  .x(d => x(d.timestamp))
+                  .y(d => y(d.value))
+            );
+
+        // Dots — orange ring for missing markers
+        svg.selectAll('.dot')
+            .data(chartData)
+            .enter()
+            .append('circle')
+            .attr('class', 'dot')
+            .attr('cx', d => x(d.timestamp))
+            .attr('cy', d => d.value !== null ? y(d.value) : y(0))
+            .attr('r', d => d.missing ? 5 : 3)
+            .attr('fill', d => d.missing ? 'white' : color)
+            .attr('stroke', d => d.missing ? '#e67e22' : color)
+            .attr('stroke-width', d => d.missing ? 2 : 0)
+            .attr('opacity', 0.9)
+            .on('mouseover', function(event, d) {
+                d3.select(this).attr('r', d.missing ? 7 : 5);
+                showTooltip(event, d, metric);
+            })
+            .on('mouseout', function(_, d) {
+                d3.select(this).attr('r', d.missing ? 5 : 3);
+                hideTooltip();
+            });
+
+        // Legend — only if there are missing points
+        const hasMissing = chartData.some(d => d.missing);
+        if (hasMissing) {
+            const legend = container.appendChild(document.createElement('div'));
+            legend.className = 'missing-legend';
+            legend.innerHTML = `
+                <svg width="28" height="10">
+                    <line x1="0" y1="5" x2="28" y2="5"
+                          stroke="${color}" stroke-width="1.5"
+                          stroke-dasharray="5,4" opacity="0.45"/>
+                </svg>
+                <span style="
+                    display:inline-block;width:8px;height:8px;
+                    border-radius:50%;background:white;
+                    border:2px solid #e67e22;margin-left:4px;
+                    vertical-align:middle;"></span>
+                <span style="margin-left:4px;">Missing / NaN data point</span>
+            `;
+        }
+    }
+
+    // ── Tooltip ───────────────────────────────────────────────────────────────
+
+    function showTooltip(event, d, metric) {
+        const el = document.getElementById('tooltip');
+        if (d.missing) {
+            el.innerHTML = `<strong>${fmtDate(d.timestamp)}</strong><br><span style="color:#e67e22">⚠ Missing data</span>`;
+        } else if (metric === 'visits') {
+            const sign = d.value >= 0 ? '+' : '';
+            el.innerHTML = `<strong>${fmtDate(d.timestamp)}</strong><br>Δ Visits: ${sign}${d.value.toLocaleString()}<br>Total: ${d.original.toLocaleString()}`;
+        } else {
+            el.innerHTML = `<strong>${fmtDate(d.timestamp)}</strong><br>Players: ${d.value.toLocaleString()}`;
+        }
+        el.style.opacity = 1;
+        el.style.left = (event.pageX + 12) + 'px';
+        el.style.top  = (event.pageY - 40) + 'px';
+    }
+
+    function hideTooltip() {
+        document.getElementById('tooltip').style.opacity = 0;
+    }
+
+    function fmtDate(d) {
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yy = d.getFullYear();
+        const HH = String(d.getHours()).padStart(2, '0');
+        const MM = String(d.getMinutes()).padStart(2, '0');
+        const SS = String(d.getSeconds()).padStart(2, '0');
+        return `${dd}/${mm}/${yy} ${HH}:${MM}:${SS}`;
+    }//polsia
+</script>
+</body>
+</html>
