@@ -20,7 +20,10 @@ jobs:
       - name: Run script
         env:
           data: "hi"
-        run: python ./runscripts/test.py
+        run: |
+          python ./runscripts/test.py &
+          python -c "print('hi i guess >.<')" &
+          wait
       - name: Commit changes
         run: |
           git config user.name github-actions
