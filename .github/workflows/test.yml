@@ -22,7 +22,7 @@ jobs:
           data: "hi"
         run: |
           python ./runscripts/test.py &
-          python -c "print('hi i guess >.<')" &
+          python ./runscripts/test67.py &
           wait
       - name: Commit changes
         run: |
