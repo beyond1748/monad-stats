@@ -167,10 +167,25 @@
 </div>
 
 <script>
+  // Each event lasts 30 min, cycle = 90 min (3 x 30 min)
+  // A starts at cycle+0min, B at cycle+30min, C at cycle+60min
+  // 16 full cycles fit in 24h
+  const EVENT_DURATION = 30 * 60; // 1800 seconds
+  const CYCLE = 90 * 60; // 5400 seconds
+
+  function buildStartSeconds(offsetMinutes) {
+    const perDay = Math.floor(86400 / CYCLE); // 16
+    const starts = [];
+    for (let i = 0; i < perDay; i++) {
+      starts.push(i * CYCLE + offsetMinutes * 60);
+    }
+    return starts;
+  }
+
   const EVENT_DEFS = [
-    { key: 'a', name: 'Battle Royale', hours: [0, 3, 6, 9, 12, 15, 18, 21] },
-    { key: 'b', name: 'Carnival',      hours: [1, 4, 7, 10, 13, 16, 19, 22] },
-    { key: 'c', name: 'Parasol',       hours: [2, 5, 8, 11, 14, 17, 20, 23] },
+    { key: 'a', name: 'Battle Royale', startSeconds: buildStartSeconds(0) },
+    { key: 'b', name: 'Carnival',      startSeconds: buildStartSeconds(30) },
+    { key: 'c', name: 'Parasol',       startSeconds: buildStartSeconds(60) },
   ];
 
   // Build card HTML for each event (once)
@@ -203,17 +218,16 @@
     return `${s}s`;
   }
 
-  function getEventStatus(hours, nowUtcSec) {
+  function getEventStatus(startSeconds, nowUtcSec) {
     const day = 86400;
     nowUtcSec = ((nowUtcSec % day) + day) % day;
     let minUntil = Infinity;
 
-    for (const h of hours) {
-      const start = h * 3600;
-      const end = start + 3600;
+    for (const start of startSeconds) {
+      const end = start + EVENT_DURATION;
       if (nowUtcSec >= start && nowUtcSec < end) {
         const elapsed = nowUtcSec - start;
-        return { ongoing: true, remaining: 3600 - elapsed, progress: (elapsed / 3600) * 100, secondsUntil: 0 };
+        return { ongoing: true, remaining: EVENT_DURATION - elapsed, progress: (elapsed / EVENT_DURATION) * 100, secondsUntil: 0 };
       }
       let until = start - nowUtcSec;
       if (until < 0) until += day;
@@ -222,13 +236,14 @@
     return { ongoing: false, secondsUntil: minUntil };
   }
 
-  function getUpcomingLocal(hours, count = 8) {
+  function getUpcomingLocal(startSeconds, count = 8) {
     const now = new Date();
-    const results = hours.map(h => {
+    const results = startSeconds.map(s => {
       const d = new Date();
-      d.setUTCHours(h, 0, 0, 0);
-      if (d <= now) d.setUTCDate(d.getUTCDate() + 1);
-      return d;
+      const utcMidnight = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+      const t = new Date(utcMidnight.getTime() + s * 1000);
+      if (t <= now) t.setUTCDate(t.getUTCDate() + 1);
+      return t;
     });
     results.sort((a, b) => a - b);
     return results.slice(0, count);
@@ -258,7 +273,7 @@
     // Compute statuses and sort
     const withStatus = EVENT_DEFS.map(ev => ({
       ...ev,
-      status: getEventStatus(ev.hours, nowUtcSec)
+      status: getEventStatus(ev.startSeconds, nowUtcSec)
     }));
 
     // Sort: ongoing first (middle slot), then by secondsUntil for the rest
@@ -283,14 +298,14 @@
     ordered.forEach(ev => c.appendChild(document.getElementById(`card-${ev.key}`)));
 
     // Update content
-    withStatus.forEach(({ key, hours, status }) => {
+    withStatus.forEach(({ key, startSeconds, status }) => {
       const card = document.getElementById(`card-${key}`);
       const statusEl = document.getElementById(`status-${key}`);
       const badgeEl = document.getElementById(`badge-${key}`);
       const progEl = document.getElementById(`prog-${key}`);
       const schedEl = document.getElementById(`sched-${key}`);
 
-      schedEl.innerHTML = buildScheduleHTML(hours);
+      schedEl.innerHTML = buildScheduleHTML(startSeconds);
 
       if (status.ongoing) {
         card.classList.add('ongoing');
