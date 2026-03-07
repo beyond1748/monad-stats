@@ -19,6 +19,6 @@ jobs:
 
       - name: Run script
         env:
-          data: "hi"
+          cookie: ${{ secrets.ROBLOX_COOKIE }}
         run: |
           python ./runscripts/validity.py
